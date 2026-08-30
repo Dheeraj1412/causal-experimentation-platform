@@ -9,3 +9,7 @@ wheels/
 # Virtual environments
 .venv
 scratch_check.py
+
+# Streamlit agent skills (environment-specific symlinks)
+.agents/
+.claude/
