@@ -1,0 +1,22 @@
+[project]
+name = "causalx"
+version = "0.1.0"
+description = "Causal inference and experimentation platform"
+readme = "README.md"
+authors = [
+    { name = "Dheeraj1412", email = "konathamdheerajreddy@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.6",
+    "pandas>=3.0.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
