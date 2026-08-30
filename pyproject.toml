@@ -8,8 +8,10 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "econml>=0.17.0",
     "numpy>=2.4.6",
     "pandas>=3.0.5",
+    "scikit-learn>=1.9.0",
 ]
 
 [build-system]
