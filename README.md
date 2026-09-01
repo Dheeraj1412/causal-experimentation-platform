@@ -1,43 +1,64 @@
-# causalx — Causal Experimentation Platform
+# causalx
 
-A causal inference toolkit for estimating treatment effects from randomized experiments, built with a simulation-first approach: every estimator is validated against data with a **known, controllable ground truth** before being trusted.
+Simulation-first toolkit for estimating treatment effects from randomized experiments. Every estimator is checked against data with a **known, controllable ground truth** before it is trusted.
 
-**Live dashboard:** run locally with `uv run streamlit run dashboard/app.py` (public deployment coming — see [Roadmap](#roadmap)).
+[![Tests](https://github.com/Dheeraj1412/causal-experimentation-platform/actions/workflows/tests.yml/badge.svg)](https://github.com/Dheeraj1412/causal-experimentation-platform/actions/workflows/tests.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
+![Streamlit scorecard showing diff-in-means, CUPED, and DR Learner on a simulated RCT](docs/dashboard.png)
 
-## Why simulation-first?
+## Quick start
 
-You can never observe a real experiment's true causal effect — only estimate it. So before trusting any estimator on real data, this project validates every one of them against a synthetic data-generating process where the true effect is known in advance. If an estimator can't recover a known truth in a world we fully control, it has no business being trusted on real data where the truth is unknown.
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.11+.
+
+```bash
+git clone https://github.com/Dheeraj1412/causal-experimentation-platform.git
+cd causal-experimentation-platform
+uv sync
+uv run pytest -v
+uv run streamlit run dashboard/app.py
+```
+
+The dashboard is **local only** (`http://localhost:8501`). There is no public deployment yet.
+
+Minimal Python usage:
+
+```python
+from causalx import simulate_experiment, diff_in_means, cuped
+
+df = simulate_experiment(n_units=200_000, true_ate=2.0, pre_period_corr=0.6, seed=1)
+print(diff_in_means(df))
+print(cuped(df)["variance_reduction_pct"])
+```
 
 ## What's implemented
 
 | Component | Description | Status |
 |---|---|---|
-| **Simulator** | RCT data generator with controllable ATE, pre-period correlation, and effect heterogeneity | ✅ |
-| **Diff-in-means** | Baseline estimator — point estimate, standard error, 95% CI | ✅ |
-| **CUPED** | Variance-reduction via pre-treatment covariate adjustment | ✅ |
-| **DR Learner** | Heterogeneous treatment effects (CATE) via EconML, doubly-robust | ✅ |
-| **Dashboard** | Live Streamlit scorecard, dark-terminal themed | ✅ |
-| mSPRT sequential testing | Always-valid p-values under continuous monitoring | ⬜ planned |
-| Power / sample-size calculator | | ⬜ planned |
-| FastAPI service | `/estimate`, `/power` endpoints | ⬜ planned |
-| Docker + CI | Containerization, GitHub Actions test pipeline | ⬜ planned |
-| Public deployment | Hugging Face Spaces | ⬜ planned |
+| **Simulator** | RCT data generator with controllable ATE, pre-period correlation, and effect heterogeneity | done |
+| **Diff-in-means** | Baseline estimator — point estimate, standard error, 95% CI | done |
+| **CUPED** | Variance-reduction via pre-treatment covariate adjustment | done |
+| **DR Learner** | Heterogeneous treatment effects (CATE) via EconML, doubly-robust | done |
+| **Dashboard** | Local Streamlit scorecard (dark theme) | done |
+| **CI** | GitHub Actions runs `uv run pytest -v` | done |
+| mSPRT sequential testing | Always-valid p-values under continuous monitoring | planned |
+| Power / sample-size calculator | | planned |
+| FastAPI service | `/estimate`, `/power` endpoints | planned |
+| Docker | Containerization | planned |
+| Public deployment | Hugging Face Spaces | planned |
 
 ## Results
 
-All results below are reproducible — see [Validation](#validation) for exact commands.
+Figures below are from `simulate_experiment(n_units=200_000, true_ate=2.0, pre_period_corr=0.6, seed=1)` unless noted. Reproduce with the snippets in [Validation](#validation).
 
 ### Diff-in-means (baseline)
-
-On 200,000 simulated units with a true ATE of 2.0:
 
 | Metric | Value |
 |---|---|
 | Point estimate | 1.9885 |
 | 95% CI | [1.9701, 2.0068] |
-| Empirical CI coverage (200 independent trials) | ~95% |
+| Empirical CI coverage (200 independent trials, n=5,000 each) | 92.5% (test allows 90–100%; nominal 95%) |
 
 ### CUPED (variance reduction)
 
@@ -50,32 +71,31 @@ Same dataset, using a pre-treatment covariate correlated at ρ=0.6:
 
 ### DR Learner (heterogeneous effects)
 
-Validated on a hand-built dataset with a known effect that varies linearly with a covariate (true effect: 0.0 at low covariate values, 4.0 at high covariate values):
+This table is **not** from the constant-effect RCT above. It uses the hand-built DGP in `tests/test_dr_learner.py` (true effect = `2 + covariate_x`, so 0.0 at x=-2 and 4.0 at x=+2):
 
 | | True effect | DR Learner estimate |
 |---|---|---|
-| At low covariate value | 0.0 | -0.04 |
-| At high covariate value | 4.0 | 4.05 |
+| At covariate x = -2 | 0.0 | -0.04 |
+| At covariate x = +2 | 4.0 | 4.05 |
 
-DR Learner correctly recovers both the direction and magnitude of effect heterogeneity, not just the population average.
+On the constant-effect RCT used by the dashboard, CATE at x=±2 is both ~2.0, as it should be.
+
+## Why simulation-first?
+
+You can never observe a real experiment's true causal effect — only estimate it. Before trusting any estimator on real data, this project checks it against a synthetic data-generating process where the true effect is known. If an estimator cannot recover a known truth in a world we fully control, it should not be trusted where the truth is unknown.
 
 ## Architecture
 
-```
-Experiment logs
-      │
-      ▼
-Ingestion & validation (schema, leakage checks)
-      │
-      ├──────────────┬──────────────┐
-      ▼              ▼              ▼
-Diff-in-means      CUPED       DR Learner
- (baseline)   (variance-reduced)  (CATE)
-      │              │              │
-      └──────────────┴──────────────┘
-                     │
-                     ▼
-          Streamlit dashboard
+What the repo actually does today: a simulator with known ground truth, three estimators, and a local Streamlit scorecard. There is no ingestion pipeline, schema validator, or leakage checker yet.
+
+```mermaid
+flowchart TD
+  sim["RCT simulator<br/>known ground-truth ATE"] --> dim["Diff-in-means<br/>baseline"]
+  sim --> cuped["CUPED<br/>variance-reduced"]
+  sim --> dr["DR Learner<br/>CATE"]
+  dim --> dash[Streamlit dashboard]
+  cuped --> dash
+  dr --> dash
 ```
 
 ## Project structure
@@ -89,54 +109,61 @@ src/causalx/
     └── dr_learner.py
 
 dashboard/
-└── app.py                         # Live Streamlit scorecard
+└── app.py                         # Local Streamlit scorecard
 
-tests/                             # 11 tests, all estimators validated
+tests/                             # pytest; run with `uv run pytest -v`
 ├── test_simulate.py
 ├── test_diff_in_means.py
 ├── test_cuped.py
 └── test_dr_learner.py
 ```
 
-## Setup
-
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.11.
-
-```bash
-git clone https://github.com/Dheeraj1412/causal-experimentation-platform.git
-cd causal-experimentation-platform
-uv sync
-```
-
 ## Validation
-
-Run the full test suite:
 
 ```bash
 uv run pytest -v
 ```
 
-Run the dashboard:
+Reproduce the tables (same seeds as above):
 
-```bash
-uv run streamlit run dashboard/app.py
+```python
+from causalx import simulate_experiment, diff_in_means, cuped, dr_learner
+import numpy as np
+import pandas as pd
+
+df = simulate_experiment(n_units=200_000, true_ate=2.0, pre_period_corr=0.6, seed=1)
+print(diff_in_means(df))
+print(cuped(df))
+
+rng = np.random.default_rng(1)
+n = 20_000
+x = rng.normal(0, 1, n)
+t = rng.binomial(1, 0.5, n)
+tau = 2.0 + x
+y = 5.0 + 0.5 * x + t * tau + rng.normal(0, 1, n)
+model = dr_learner(pd.DataFrame({"outcome": y, "treatment": t, "covariate_x": x}))["model"]
+print(model.effect(np.array([[-2.0]]))[0], model.effect(np.array([[2.0]]))[0])
 ```
 
 ## Validity assumptions
 
-Diff-in-means and CUPED require **proper randomization** — treatment assignment independent of potential outcomes. This was deliberately verified: breaking randomization in the simulator (making treatment depend on a covariate rather than a coin flip) causes diff-in-means to recover a biased estimate (4.22 instead of the true 2.0) that does not improve with more data — confirming these estimators fail exactly as theory predicts under confounding, and correctly succeed under proper randomization.
+Diff-in-means and CUPED require **proper randomization** — treatment assignment independent of potential outcomes. Breaking that in the same DGP (assign `treatment = 1{covariate_x > 0}` instead of a coin flip) yields a biased estimate of **4.22** vs true ATE 2.0 at n=200,000 (`seed=1`), and the bias does not vanish at larger n. That check lives in `tests/test_diff_in_means.py`.
 
-DR Learner is doubly robust: it remains unbiased if either its propensity model or its outcome model is approximately correct, making it more resilient to imperfect randomization in real-world (non-experimental) data.
+DR Learner is doubly robust: it remains unbiased if either its propensity model or its outcome model is approximately correct. That is a property of the method, not something this repo separately proves on observational data.
 
 ## Roadmap
 
 - mSPRT sequential testing for always-valid inference under continuous monitoring
-- Power/sample-size calculator
-- FastAPI service exposing all estimators via `/estimate` and `/power`
-- Docker containerization + GitHub Actions CI
-- Public deployment via Hugging Face Spaces
-- Published package on TestPyPI
+- Power / sample-size calculator
+- FastAPI service exposing estimators via `/estimate` and `/power`
+- Docker image
+- Public dashboard on Hugging Face Spaces
+- Publish the package to TestPyPI
 
 ## Tech stack
 
 Python 3.11 · pandas · numpy · [EconML](https://github.com/py-why/EconML) · scikit-learn · Streamlit · pytest · uv
+
+## License
+
+MIT. See [LICENSE](LICENSE).

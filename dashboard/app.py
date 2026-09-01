@@ -52,8 +52,13 @@ col6.metric(
     delta_color="inverse",
 )
 
-st.markdown("#### DR learner (heterogeneous effects)")
-st.caption("effect estimated at low vs. high covariate_x — not a single average")
+st.markdown("#### DR learner (CATE at two covariate values)")
+st.caption(
+    "This scorecard uses a constant-effect RCT (true ATE = 2.0), so CATE at "
+    "x = ±2 should both be ~2. Heterogeneity recovery is validated separately "
+    "in tests/test_dr_learner.py against a DGP where the true effect is 0 at "
+    "x = -2 and 4 at x = +2."
+)
 
 dr_result = get_dr_result(df)
 model = dr_result["model"]
