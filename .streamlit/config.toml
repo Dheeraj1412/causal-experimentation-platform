@@ -1,6 +1,27 @@
+[client]
+# Hide Deploy / rerun chrome so the local scorecard does not imply a
+# cloud deploy flow that is not set up.
+toolbarMode = "viewer"
+
 [theme]
 base = "dark"
 backgroundColor = "#0b0d10"
 secondaryBackgroundColor = "#12151a"
-textColor = "#f5f5f0"
+textColor = "#e8e6dc"
+primaryColor = "#3ee07a"
+linkColor = "#7ec8e3"
+borderColor = "#2a3038"
+baseRadius = "0.35rem"
 font = "monospace"
+headingFont = "monospace"
+codeFont = "monospace"
+baseFontSize = 16
+headingFontSizes = ["1.5rem", "1.125rem", "0.9375rem", "0.75rem", "0.75rem", "0.75rem"]
+headingFontWeights = [500, 500, 500, 500, 500, 500]
+metricValueFontSize = "1.5rem"
+metricValueFontWeight = 500
+greenColor = "#3ee07a"
+redColor = "#ff7a7a"
+orangeColor = "#e6b84a"
+grayColor = "#9aa3ad"
+showWidgetBorder = true
